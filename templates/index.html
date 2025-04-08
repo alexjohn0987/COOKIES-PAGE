@@ -1,66 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Facebook Commenter</title>
+    <title>Facebook Auto Commenter</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input, textarea { width: 100%; padding: 8px; }
-        textarea { height: 100px; }
-        button { padding: 10px 15px; background: #4CAF50; color: white; border: none; cursor: pointer; }
-        .task-status { margin-top: 20px; padding: 15px; background: #f5f5f5; }
+        input, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+        textarea { height: 100px; resize: vertical; }
+        button { padding: 10px 15px; background: #4CAF50; color: white; border: none; cursor: pointer; margin-right: 10px; }
+        button:disabled { background: #cccccc; }
+        .task-status { margin-top: 20px; padding: 15px; background: #f5f5f5; display: none; }
+        .status-item { margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h1>Facebook Commenter</h1>
+    <h1>Facebook Auto Commenter</h1>
     
-    <form id="commentForm">
-        <div class="form-group">
-            <label>Cookies (one per line):</label>
-            <textarea name="cookies" required></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label>Post URL:</label>
-            <input type="text" name="post_url" required>
-        </div>
-        
-        <div class="form-group">
-            <label>Hater Name:</label>
-            <input type="text" name="hater_name" required>
-        </div>
-        
-        <div class="form-group">
-            <label>Last Name:</label>
-            <input type="text" name="last_name" required>
-        </div>
-        
-        <div class="form-group">
-            <label>Comments (one per line):</label>
-            <textarea name="comments" required></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label>Delay (seconds):</label>
-            <input type="number" name="delay" value="10" min="5" required>
-        </div>
-        
-        <button type="button" id="startBtn">Start Commenting</button>
-        <button type="button" id="stopBtn" disabled>Stop</button>
-    </form>
-    
-    <div id="taskInfo" class="task-status" style="display: none;">
-        <h2>Task Status</h2>
-        <p>Task ID: <span id="taskId"></span></p>
-        <p>Status: <span id="taskStatus"></span></p>
-        <p>Comments Sent: <span id="commentCount"></span></p>
-        <p>Last Status: <span id="lastStatus"></span></p>
+    <div class="form-group">
+        <label for="cookies">Facebook Cookies:</label>
+        <textarea id="cookies" required></textarea>
     </div>
     
-    <div id="activeTasks">
-        <h2>Active Tasks</h2>
-        <div id="tasksList"></div>
+    <div class="form-group">
+        <label for="post_url">Post URL:</label>
+        <input type="text" id="post_url" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="hater_name">Hater Name:</label>
+        <input type="text" id="hater_name" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="last_name">Last Name:</label>
+        <input type="text" id="last_name" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="comments">Comments (one per line):</label>
+        <textarea id="comments" required></textarea>
+    </div>
+    
+    <div class="form-group">
+        <label for="delay">Delay between comments (seconds):</label>
+        <input type="number" id="delay" value="10" min="5" required>
+    </div>
+    
+    <button id="startBtn">Start Commenting</button>
+    <button id="stopBtn" disabled>Stop</button>
+    
+    <div id="taskInfo" class="task-status">
+        <h2>Task Status</h2>
+        <div class="status-item">Task ID: <span id="taskId"></span></div>
+        <div class="status-item">Status: <span id="taskStatus"></span></div>
+        <div class="status-item">Comments Sent: <span id="commentCount"></span></div>
+        <div class="status-item">Last Status: <span id="lastStatus"></span></div>
     </div>
 
     <script>
@@ -70,15 +65,21 @@
         document.getElementById('stopBtn').addEventListener('click', stopTask);
         
         function startTask() {
-            const formData = new FormData(document.getElementById('commentForm'));
-            const data = Object.fromEntries(formData.entries());
+            const data = {
+                cookies: document.getElementById('cookies').value,
+                post_url: document.getElementById('post_url').value,
+                hater_name: document.getElementById('hater_name').value,
+                last_name: document.getElementById('last_name').value,
+                comments: document.getElementById('comments').value,
+                delay: document.getElementById('delay').value
+            };
             
             fetch('/start_task', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
-            .then(res => res.json())
+            .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
                     currentTaskId = data.task_id;
@@ -96,7 +97,7 @@
             if (!currentTaskId) return;
             
             fetch(`/stop_task/${currentTaskId}`, { method: 'POST' })
-            .then(res => res.json())
+            .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
                     document.getElementById('stopBtn').disabled = true;
@@ -108,7 +109,7 @@
             if (!currentTaskId) return;
             
             fetch(`/task_status/${currentTaskId}`)
-            .then(res => res.json())
+            .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
                     document.getElementById('taskStatus').textContent = data.data.status;
@@ -121,39 +122,6 @@
                 }
             });
         }
-        
-        function updateActiveTasks() {
-            fetch('/active_tasks')
-            .then(res => res.json())
-            .then(data => {
-                const tasksList = document.getElementById('tasksList');
-                tasksList.innerHTML = '';
-                
-                if (data.data && Object.keys(data.data).length > 0) {
-                    for (const [taskId, task] of Object.entries(data.data)) {
-                        const taskDiv = document.createElement('div');
-                        taskDiv.innerHTML = `
-                            <div style="border:1px solid #ddd; padding:10px; margin:5px 0;">
-                                <h3>Task ${taskId}</h3>
-                                <p>Status: ${task.status}</p>
-                                <p>Comments: ${task.comment_count}</p>
-                                <button onclick="stopSpecificTask('${taskId}')">Stop</button>
-                            </div>
-                        `;
-                        tasksList.appendChild(taskDiv);
-                    }
-                }
-            });
-            
-            setTimeout(updateActiveTasks, 3000);
-        }
-        
-        window.stopSpecificTask = function(taskId) {
-            fetch(`/stop_task/${taskId}`, { method: 'POST' });
-        };
-        
-        // Initial load
-        updateActiveTasks();
     </script>
 </body>
 </html>
