@@ -1,86 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Facebook Auto Commenter PRO</title>
+    <title>Facebook Commenter (JSON Only)</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
-        textarea { height: 100px; resize: vertical; }
-        button { padding: 10px 15px; background: #4CAF50; color: white; border: none; cursor: pointer; margin-right: 10px; }
-        button:disabled { background: #cccccc; }
-        .task-status { margin-top: 20px; padding: 15px; background: #f5f5f5; display: none; }
-        .status-item { margin-bottom: 10px; }
-        .task-control { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
-        #activeTasks { margin-top: 20px; }
-        .task-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        textarea { width: 100%; height: 120px; }
+        button { padding: 10px 15px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        .task-status { margin-top: 20px; padding: 15px; background: #f5f5f5; }
     </style>
 </head>
 <body>
-    <h1>Facebook Auto Commenter PRO</h1>
+    <h1>Facebook Auto Commenter</h1>
     
     <div class="form-group">
-        <label for="cookies">Facebook Cookies:</label>
-        <textarea id="cookies" placeholder="sb=xxx; datr=xxx; c_user=xxx; xs=xxx" required></textarea>
+        <label>Cookies (JSON Format):</label>
+        <textarea id="cookies" placeholder='{"sb":"value","datr":"value","c_user":"123"}'></textarea>
     </div>
     
     <div class="form-group">
-        <label for="post_url">Post URL:</label>
-        <input type="text" id="post_url" placeholder="https://m.facebook.com/..." required>
+        <label>Post URL:</label>
+        <input type="text" id="post_url">
     </div>
     
     <div class="form-group">
-        <label for="hater_name">Hater Name:</label>
-        <input type="text" id="hater_name" required>
+        <label>Hater Name:</label>
+        <input type="text" id="hater_name">
     </div>
     
     <div class="form-group">
-        <label for="last_name">Last Name:</label>
-        <input type="text" id="last_name" required>
+        <label>Last Name:</label>
+        <input type="text" id="last_name">
     </div>
     
     <div class="form-group">
-        <label for="comments">Comments (one per line):</label>
-        <textarea id="comments" required></textarea>
+        <label>Comments (one per line):</label>
+        <textarea id="comments"></textarea>
     </div>
     
     <div class="form-group">
-        <label for="delay">Delay between comments (seconds):</label>
-        <input type="number" id="delay" value="10" min="5" required>
+        <label>Delay (seconds):</label>
+        <input type="number" id="delay" value="10" min="5">
     </div>
     
-    <button id="startBtn">Start Commenting</button>
+    <button id="startBtn">Start</button>
     <button id="stopBtn" disabled>Stop</button>
     
-    <div id="taskInfo" class="task-status">
-        <h2>Task Status</h2>
-        <div class="status-item">Task ID: <span id="taskId"></span></div>
-        <div class="status-item">Status: <span id="taskStatus"></span></div>
-        <div class="status-item">Comments Sent: <span id="commentCount"></span></div>
-        <div class="status-item">Last Status: <span id="lastStatus"></span></div>
-    </div>
-    
-    <div class="task-control">
-        <h2>Task Management</h2>
-        <div class="form-group">
-            <label for="controlTaskId">Task ID:</label>
-            <input type="text" id="controlTaskId" placeholder="Enter task ID">
-            <button onclick="checkStatus()">Check Status</button>
-            <button onclick="stopSpecificTask()">Stop Task</button>
-        </div>
-        
-        <h3>Active Tasks</h3>
-        <div id="activeTasks"></div>
+    <div id="taskInfo" class="task-status" style="display: none;">
+        <h3>Task Status</h3>
+        <p>ID: <span id="taskId"></span></p>
+        <p>Status: <span id="taskStatus"></span></p>
+        <p>Comments: <span id="commentCount"></span></p>
     </div>
 
     <script>
         let currentTaskId = null;
         
-        document.getElementById('startBtn').addEventListener('click', startTask);
-        document.getElementById('stopBtn').addEventListener('click', stopTask);
-        
-        function startTask() {
+        document.getElementById('startBtn').addEventListener('click', () => {
             const data = {
                 cookies: document.getElementById('cookies').value,
                 post_url: document.getElementById('post_url').value,
@@ -102,59 +79,14 @@
                     document.getElementById('taskId').textContent = currentTaskId;
                     document.getElementById('taskInfo').style.display = 'block';
                     document.getElementById('stopBtn').disabled = false;
-                    updateTaskStatus();
-                    updateActiveTasks();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to start task');
-            });
-        }
-        
-        function stopTask() {
-            if (!currentTaskId) return;
-            
-            fetch(`/stop_task/${currentTaskId}`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    document.getElementById('stopBtn').disabled = true;
-                    updateActiveTasks();
-                }
-            });
-        }
-        
-        function checkStatus() {
-            const taskId = document.getElementById('controlTaskId').value;
-            if (!taskId) return alert('Enter Task ID');
-            
-            fetch(`/task_status/${taskId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    alert(`Status: ${data.data.status}\nComments: ${data.data.comment_count}\nLast: ${data.data.last_status}`);
+                    updateStatus();
                 } else {
                     alert('Error: ' + data.message);
                 }
             });
-        }
+        });
         
-        function stopSpecificTask() {
-            const taskId = document.getElementById('controlTaskId').value;
-            if (!taskId) return alert('Enter Task ID');
-            
-            fetch(`/stop_task/${taskId}`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.status === 'success' ? 'Task stopped' : 'Error: ' + data.message);
-                updateActiveTasks();
-            });
-        }
-        
-        function updateTaskStatus() {
+        function updateStatus() {
             if (!currentTaskId) return;
             
             fetch(`/task_status/${currentTaskId}`)
@@ -163,48 +95,10 @@
                 if (data.status === 'success') {
                     document.getElementById('taskStatus').textContent = data.data.status;
                     document.getElementById('commentCount').textContent = data.data.comment_count;
-                    document.getElementById('lastStatus').textContent = data.data.last_status;
-                    
-                    if (data.data.status === 'running') {
-                        setTimeout(updateTaskStatus, 2000);
-                    }
+                    if (data.data.status === 'running') setTimeout(updateStatus, 2000);
                 }
             });
         }
-        
-        function updateActiveTasks() {
-            fetch('/active_tasks')
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('activeTasks');
-                container.innerHTML = '';
-                
-                if (data.data && Object.keys(data.data).length > 0) {
-                    for (const [taskId, task] of Object.entries(data.data)) {
-                        const taskDiv = document.createElement('div');
-                        taskDiv.className = 'task-card';
-                        taskDiv.innerHTML = `
-                            <h4>Task ID: ${taskId}</h4>
-                            <p>Status: ${task.status}</p>
-                            <p>Comments: ${task.comment_count}</p>
-                            <button onclick="controlTask('${taskId}')">Stop</button>
-                        `;
-                        container.appendChild(taskDiv);
-                    }
-                } else {
-                    container.innerHTML = '<p>No active tasks</p>';
-                }
-            });
-        }
-        
-        function controlTask(taskId) {
-            fetch(`/stop_task/${taskId}`, { method: 'POST' })
-            .then(() => updateActiveTasks());
-        }
-        
-        // Initial load
-        updateActiveTasks();
-        setInterval(updateActiveTasks, 5000);
     </script>
 </body>
 </html>
