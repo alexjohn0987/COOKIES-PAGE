@@ -4,117 +4,65 @@
     <title>Facebook Auto Commenter PRO</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .form-section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input, textarea, select { width: 100%; padding: 8px; box-sizing: border-box; }
+        input, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
         textarea { height: 100px; resize: vertical; }
-        button { padding: 10px 15px; margin-right: 10px; cursor: pointer; }
-        #startBtn { background: #4CAF50; color: white; border: none; }
-        #stopBtn { background: #f44336; color: white; border: none; }
+        button { padding: 10px 15px; background: #4CAF50; color: white; border: none; cursor: pointer; margin-right: 10px; }
         button:disabled { background: #cccccc; }
-        .task-status { margin-top: 20px; padding: 15px; background: #f5f5f5; }
+        .task-status { margin-top: 20px; padding: 15px; background: #f5f5f5; display: none; }
         .status-item { margin-bottom: 10px; }
-        .file-input { display: none; }
-        .file-label { display: inline-block; padding: 8px 15px; background: #2196F3; color: white; cursor: pointer; }
-        .tab { overflow: hidden; border: 1px solid #ccc; background-color: #f1f1f1; }
-        .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 10px 15px; }
-        .tab button:hover { background-color: #ddd; }
-        .tab button.active { background-color: #ccc; }
-        .tabcontent { display: none; padding: 10px; border: 1px solid #ccc; border-top: none; }
+        .task-control { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+        #activeTasks { margin-top: 20px; }
+        .task-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <h1>Facebook Auto Commenter PRO</h1>
     
-    <div class="form-section">
-        <h2>Authentication</h2>
-        
-        <div class="tab">
-            <button class="tablinks active" onclick="openTab('cookies-text')">Enter Cookies</button>
-            <button class="tablinks" onclick="openTab('cookies-file')">Upload Cookies File</button>
-        </div>
-        
-        <div id="cookies-text" class="tabcontent" style="display: block;">
-            <div class="form-group">
-                <label for="cookies_text">Facebook Cookies:</label>
-                <textarea id="cookies_text" placeholder="sb=xyz; datr=abc; c_user=123..."></textarea>
-            </div>
-        </div>
-        
-        <div id="cookies-file" class="tabcontent">
-            <div class="form-group">
-                <label>Upload Cookies File:</label>
-                <input type="file" id="cookies_file" class="file-input" accept=".txt,.json">
-                <label for="cookies_file" class="file-label">Choose File</label>
-                <span id="cookies-file-name">No file selected</span>
-            </div>
-        </div>
+    <div class="form-group">
+        <label for="cookies">Facebook Cookies:</label>
+        <textarea id="cookies" placeholder="sb=xxx; datr=xxx; c_user=xxx; xs=xxx" required></textarea>
     </div>
     
-    <div class="form-section">
-        <h2>Post Information</h2>
-        <div class="form-group">
-            <label for="post_url">Post URL:</label>
-            <input type="text" id="post_url" placeholder="https://www.facebook.com/...">
-        </div>
+    <div class="form-group">
+        <label for="post_url">Post URL:</label>
+        <input type="text" id="post_url" placeholder="https://m.facebook.com/..." required>
     </div>
     
-    <div class="form-section">
-        <h2>Comment Settings</h2>
-        <div class="form-group">
-            <label for="hater_name">Hater Name:</label>
-            <input type="text" id="hater_name">
-        </div>
-        
-        <div class="form-group">
-            <label for="last_name">Last Name:</label>
-            <input type="text" id="last_name">
-        </div>
-        
-        <div class="tab">
-            <button class="tablinks active" onclick="openTab('comments-text')">Enter Comments</button>
-            <button class="tablinks" onclick="openTab('comments-file')">Upload Comments File</button>
-        </div>
-        
-        <div id="comments-text" class="tabcontent" style="display: block;">
-            <div class="form-group">
-                <label for="comments_text">Comments (one per line):</label>
-                <textarea id="comments_text"></textarea>
-            </div>
-        </div>
-        
-        <div id="comments-file" class="tabcontent">
-            <div class="form-group">
-                <label>Upload Comments File:</label>
-                <input type="file" id="comments_file" class="file-input" accept=".txt">
-                <label for="comments_file" class="file-label">Choose File</label>
-                <span id="comments-file-name">No file selected</span>
-            </div>
-        </div>
-        
-        <div class="form-group">
-            <label for="delay">Delay between comments (seconds):</label>
-            <input type="number" id="delay" value="10" min="5">
-        </div>
+    <div class="form-group">
+        <label for="hater_name">Hater Name:</label>
+        <input type="text" id="hater_name" required>
     </div>
     
-    <div class="form-section">
-        <button id="startBtn">Start Commenting</button>
-        <button id="stopBtn" disabled>Stop</button>
+    <div class="form-group">
+        <label for="last_name">Last Name:</label>
+        <input type="text" id="last_name" required>
     </div>
     
-    <div id="taskInfo" class="task-status" style="display: none;">
+    <div class="form-group">
+        <label for="comments">Comments (one per line):</label>
+        <textarea id="comments" required></textarea>
+    </div>
+    
+    <div class="form-group">
+        <label for="delay">Delay between comments (seconds):</label>
+        <input type="number" id="delay" value="10" min="5" required>
+    </div>
+    
+    <button id="startBtn">Start Commenting</button>
+    <button id="stopBtn" disabled>Stop</button>
+    
+    <div id="taskInfo" class="task-status">
         <h2>Task Status</h2>
         <div class="status-item">Task ID: <span id="taskId"></span></div>
         <div class="status-item">Status: <span id="taskStatus"></span></div>
         <div class="status-item">Comments Sent: <span id="commentCount"></span></div>
-        <div class="status-item">Uptime: <span id="uptime"></span></div>
         <div class="status-item">Last Status: <span id="lastStatus"></span></div>
     </div>
     
-    <div class="form-section">
-        <h2>Task Control</h2>
+    <div class="task-control">
+        <h2>Task Management</h2>
         <div class="form-group">
             <label for="controlTaskId">Task ID:</label>
             <input type="text" id="controlTaskId" placeholder="Enter task ID">
@@ -129,64 +77,23 @@
     <script>
         let currentTaskId = null;
         
-        // Tab functionality
-        function openTab(tabName) {
-            const tabcontent = document.getElementsByClassName("tabcontent");
-            for (let i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-            
-            const tablinks = document.getElementsByClassName("tablinks");
-            for (let i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-            
-            document.getElementById(tabName).style.display = "block";
-            event.currentTarget.className += " active";
-        }
-        
-        // File input handlers
-        document.getElementById('cookies_file').addEventListener('change', function(e) {
-            document.getElementById('cookies-file-name').textContent = 
-                e.target.files[0] ? e.target.files[0].name : 'No file selected';
-        });
-        
-        document.getElementById('comments_file').addEventListener('change', function(e) {
-            document.getElementById('comments-file-name').textContent = 
-                e.target.files[0] ? e.target.files[0].name : 'No file selected';
-        });
-        
-        // Start task
         document.getElementById('startBtn').addEventListener('click', startTask);
+        document.getElementById('stopBtn').addEventListener('click', stopTask);
         
         function startTask() {
-            const formData = new FormData();
-            
-            // Get cookies
-            const cookiesFile = document.getElementById('cookies_file').files[0];
-            if (cookiesFile) {
-                formData.append('cookies_file', cookiesFile);
-            } else {
-                formData.append('cookies_text', document.getElementById('cookies_text').value);
-            }
-            
-            // Get comments
-            const commentsFile = document.getElementById('comments_file').files[0];
-            if (commentsFile) {
-                formData.append('comments_file', commentsFile);
-            } else {
-                formData.append('comments_text', document.getElementById('comments_text').value);
-            }
-            
-            // Add other fields
-            formData.append('post_url', document.getElementById('post_url').value);
-            formData.append('hater_name', document.getElementById('hater_name').value);
-            formData.append('last_name', document.getElementById('last_name').value);
-            formData.append('delay', document.getElementById('delay').value);
+            const data = {
+                cookies: document.getElementById('cookies').value,
+                post_url: document.getElementById('post_url').value,
+                hater_name: document.getElementById('hater_name').value,
+                last_name: document.getElementById('last_name').value,
+                comments: document.getElementById('comments').value,
+                delay: document.getElementById('delay').value
+            };
             
             fetch('/start_task', {
                 method: 'POST',
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
             })
             .then(response => response.json())
             .then(data => {
@@ -200,20 +107,17 @@
                 } else {
                     alert('Error: ' + data.message);
                 }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to start task');
             });
         }
-        
-        // Stop current task
-        document.getElementById('stopBtn').addEventListener('click', stopTask);
         
         function stopTask() {
             if (!currentTaskId) return;
             
-            fetch('/stop_task', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: currentTaskId })
-            })
+            fetch(`/stop_task/${currentTaskId}`, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
@@ -223,54 +127,42 @@
             });
         }
         
-        // Check status of specific task
         function checkStatus() {
             const taskId = document.getElementById('controlTaskId').value;
-            if (!taskId) return;
+            if (!taskId) return alert('Enter Task ID');
             
-            fetch(`/task_status?task_id=${taskId}`)
+            fetch(`/task_status/${taskId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert(`Task Status:\n\nID: ${taskId}\nStatus: ${data.data.status}\nComments: ${data.data.comment_count}\nLast Status: ${data.data.last_status}`);
+                    alert(`Status: ${data.data.status}\nComments: ${data.data.comment_count}\nLast: ${data.data.last_status}`);
                 } else {
                     alert('Error: ' + data.message);
                 }
             });
         }
         
-        // Stop specific task
         function stopSpecificTask() {
             const taskId = document.getElementById('controlTaskId').value;
-            if (!taskId) return;
+            if (!taskId) return alert('Enter Task ID');
             
-            fetch('/stop_task', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: taskId })
-            })
+            fetch(`/stop_task/${taskId}`, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
-                    alert('Task stopped successfully');
-                    updateActiveTasks();
-                } else {
-                    alert('Error: ' + data.message);
-                }
+                alert(data.status === 'success' ? 'Task stopped' : 'Error: ' + data.message);
+                updateActiveTasks();
             });
         }
         
-        // Update task status
         function updateTaskStatus() {
             if (!currentTaskId) return;
             
-            fetch(`/task_status?task_id=${currentTaskId}`)
+            fetch(`/task_status/${currentTaskId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
                     document.getElementById('taskStatus').textContent = data.data.status;
                     document.getElementById('commentCount').textContent = data.data.comment_count;
-                    document.getElementById('uptime').textContent = data.data.uptime;
                     document.getElementById('lastStatus').textContent = data.data.last_status;
                     
                     if (data.data.status === 'running') {
@@ -280,7 +172,6 @@
             });
         }
         
-        // Update active tasks list
         function updateActiveTasks() {
             fetch('/active_tasks')
             .then(response => response.json())
@@ -291,18 +182,13 @@
                 if (data.data && Object.keys(data.data).length > 0) {
                     for (const [taskId, task] of Object.entries(data.data)) {
                         const taskDiv = document.createElement('div');
-                        taskDiv.style.border = '1px solid #ddd';
-                        taskDiv.style.padding = '10px';
-                        taskDiv.style.margin = '5px 0';
-                        
+                        taskDiv.className = 'task-card';
                         taskDiv.innerHTML = `
                             <h4>Task ID: ${taskId}</h4>
                             <p>Status: ${task.status}</p>
-                            <p>Comments Sent: ${task.comment_count}</p>
-                            <p>Uptime: ${task.uptime}</p>
-                            <button onclick="controlTask('${taskId}', 'stop')">Stop</button>
+                            <p>Comments: ${task.comment_count}</p>
+                            <button onclick="controlTask('${taskId}')">Stop</button>
                         `;
-                        
                         container.appendChild(taskDiv);
                     }
                 } else {
@@ -311,19 +197,12 @@
             });
         }
         
-        // Control specific task
-        function controlTask(taskId, action) {
-            if (action === 'stop') {
-                fetch('/stop_task', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ task_id: taskId })
-                })
-                .then(() => updateActiveTasks());
-            }
+        function controlTask(taskId) {
+            fetch(`/stop_task/${taskId}`, { method: 'POST' })
+            .then(() => updateActiveTasks());
         }
         
-        // Initialize
+        // Initial load
         updateActiveTasks();
         setInterval(updateActiveTasks, 5000);
     </script>
